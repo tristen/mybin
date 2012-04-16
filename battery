@@ -20,7 +20,6 @@ cutinate()
     done
 }
 
-# Do with grep and awk unless too hard
 battery_status()
 {
     case $1 in
