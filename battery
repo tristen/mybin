@@ -1,66 +1,77 @@
 #!/bin/sh
 
+help()
+{
+  cat <<EOF
+
+    battery: An output of battery usage for osx
+
+    USAGE:
+    battery [-h]
+
+    EXAMPLES:
+    battery
+    78%
+
+    battery -hearts
+    ♥ ♥ ♥ ♥ ♡
+
+EOF
+}
+
+[ "$1" == '-h' ] && {
+  help
+  exit
+}
+
+
 HEART_FULL=♥
 HEART_EMPTY=♡
 [ -z "$NUM_HEARTS" ] &&
     NUM_HEARTS=5
 
-cutinate()
+hearts()
 {
-    perc=$1
-    inc=$(( 100 / $NUM_HEARTS))
+  perc=$1
+  inc=$(( 100 / $NUM_HEARTS))
 
-    for i in `seq $NUM_HEARTS`; do
-        if [ $perc -ge 0 ]; then
-            echo $HEART_FULL
-        else
-            echo $HEART_EMPTY
-        fi
-        perc=$(( $perc - $inc ))
-    done
+  for i in `seq $NUM_HEARTS`; do
+    if [ $perc -ge 0 ]; then
+        echo $HEART_FULL
+    else
+        echo $HEART_EMPTY
+    fi
+    perc=$(( $perc - $inc ))
+  done
 }
 
-battery_status()
+battery()
 {
-    case $1 in
-        "Discharging")
-            ext="No";;
-        "Charging")
-            ext="Yes";;
+  ioreg -c AppleSmartBattery -w0 | \
+  grep -o '"[^"]*" = [^ ]*' | \
+  sed -e 's/= //g' -e 's/"//g' | \
+  sort | \
+  while read key value; do
+    case $key in
+      "MaxCapacity")
+        export maxcap=$value;;
+      "CurrentCapacity")
+        export curcap=$value;;
     esac
-
-    ioreg -c AppleSmartBattery -w0 | \
-    grep -o '"[^"]*" = [^ ]*' | \
-    sed -e 's/= //g' -e 's/"//g' | \
-    sort | \
-    while read key value; do
-        case $key in
-            "MaxCapacity")
-                export maxcap=$value;;
-            "CurrentCapacity")
-                export curcap=$value;;
-            "ExternalConnected")
-                if [ "$ext" != "$value" ]; then
-                    exit
-                fi
-            ;;
-            "FullyCharged") if [ "$value" = "Yes" ]; then
-                    exit
-                fi
-            ;;
-        esac
-        if [[ -n "$maxcap" && -n $curcap ]]; then
-            echo "100 * $curcap / $maxcap" | bc
-            break
-        fi
-    done
+    if [[ -n "$maxcap" && -n $curcap ]]; then
+      echo "100 * $curcap / $maxcap" | bc
+      break
+    fi
+  done
 }
 
-BATTERY_STATUS=`battery_status $1`
-[ -z "$BATTERY_STATUS" ] && exit
+STATUS=`battery`
+[ -z "$STATUS" ] && exit
 
-if [ -n "$CUTE_BATTERY_INDICATOR" ]; then
-    echo `cutinate $BATTERY_STATUS` ${BATTERY_STATUS}%
+if [ "$1" == '-hearts' ]; then
+  echo `hearts $STATUS`
+elif [ "$1" == '-verbose' ]; then
+  echo ${STATUS}% $STATE
 else
-    echo ${BATTERY_STATUS}%
+  echo ${STATUS}%
 fi
